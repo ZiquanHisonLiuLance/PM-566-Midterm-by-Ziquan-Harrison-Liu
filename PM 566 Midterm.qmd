@@ -1,0 +1,38 @@
+---
+title: "PM 566 Midterm Project"
+author: "Ziquan 'Harrison' Liu"
+format: 
+  html:
+    embed-resources: true
+fig-width: 8
+fig-heigth: 6
+---
+# Introduction
+
+# Data preparing
+```{r}
+
+```
+
+
+# Exploratory Analysis
+```{r}
+
+```
+
+
+# Preliminary Results
+```{r}
+
+```
+
+
+# Conclusion:
+
+
+
+
+
+
+
+
