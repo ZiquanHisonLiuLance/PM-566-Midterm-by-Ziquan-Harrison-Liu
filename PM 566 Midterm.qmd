@@ -7,32 +7,329 @@ format:
 fig-width: 8
 fig-heigth: 6
 ---
-# Introduction
-
-# Data preparing
+# Requried packages
 ```{r}
-
+library(tidyverse)  # dplyr, ggplot2, readr, string tools, plotting
+library(dplyr)      # explicit for pipes and data wrangling
+library(ggplot2)    # ggplot plotting
+library(readr)      # fast/read_csv
+library(stringr)    # string cleanup / regex
+library(lubridate)  # work with dates (for stock update timestamps)
+library(knitr)      # nice summary tables via kable()
+library(kableExtra) # styling kable() for report-quality tables
+library(maps)       # state map polygons for U.S. choropleth 
+library(countrycode) # optional helper if we ever need state mapping
+library(forcats)    # reorder factors for nicer plots (top providers)
+library(patchwork)    # to combine multiple ggplots into one figure grid
+library(ggcorrplot)   # nice correlation heatmaps; install.packages("ggcorrplot") if missing
 ```
 
+# 1. Introduction
+## Description of Dataset: The dataset I utilzied was a national registry of influenza (flu) vaccination provider locations published by the U.S. Centers for Disease Control and Prevention (CDC) through the Vaccines.gov platform. The dataset contained point-level information on health care sites (e.g., pharmacies, clinics, health departments) that report offering influenza vaccination to the public. The dataset was designed to support public-facing vaccine finder tools and programmatic monitoring of geographic access to flu vaccination. There are 28 colomns and 202652 observations included in this dataset. In other words, 202,652 locations across 53 state or territorial codes. Temporal stamps reflect inventory/operational updates from 2023-08-17 through 2024-08-01. 
+## Primary Question: How are flu vaccination provider locations distributed across the United States, and what patterns emerge when examining provider characteristics such as minimum eligible age?
 
-# Exploratory Analysis
+# 2. Data preparing
 ```{r}
-
+# 2.1Read the dataset
+fluvacall = read.csv("/Users/ldh/Library/Mobile Documents/com~apple~CloudDocs/USC PhD/STUDY DOCUMENTS/Fall 2025/PM 566/Midterm/Potential Dataset/Vaccines.gov__Flu_vaccinating_provider_locations_20251026.csv")
 ```
 
-
-# Preliminary Results
 ```{r}
-
+# 2.2 Wrangle & standardize variables being analyzed
+## provider_chain: a simplified provider “brand” from loc_name
+## vaccine_type: the general product category (“Flu Shot”, “Flu Shot (65+)”, etc.) from searchable_name
+## age_group: extract age eligibility like “65+”
+## last_update_date: parsed quantity_last_updated
+## days_since_update: how stale the stock info is (use Sys.Date() for “today”)
+## state / lat / lon kept for mapping
+## in_stock_flag and supply_level for availability
+# --- Data Prep: create cleaned analytic dataset
+# --- Data Prep: create cleaned analytic dataset
+fluvac <- fluvacall %>%                                                   # start with raw data
+  mutate(
+    provider_chain = str_squish(loc_name),                                  # collapse extra spaces in provider name
+    vaccine_type   = str_squish(searchable_name),                            # human-readable vaccine label such as "Flu Shot", "Flu Shot"
+    age_group      = if_else(str_detect(searchable_name, "65\\+"),                               
+                              "65_plus",           # pull explicit age info if mentioned (e.g. "65+")
+                       if_else(str_detect(searchable_name, "Nasal Spray"),  # nasal spray often used for younger, generally healthy non-pregnant <50
+                              "younger_adult_child",
+                              "all_ages_general")),                          # fallback if not specifically flagged
+    last_update_date = suppressWarnings(lubridate::ymd(quantity_last_updated)),  # parse last stock update "YYYY-MM-DD" string into Date
+    days_since_update = as.numeric(Sys.Date() - last_update_date),          # how many days since that location last reported stock, proxy for freshness
+    state = loc_admin_state,                                                # 2-letter state / territory code (e.g. "CA", "MA","NC")
+    lat = latitude,                                                         # latitude coordinate for mapping
+    lon = longitude,                                                        # longitude coordinate for mapping
+    in_stock_flag = in_stock,                                               # TRUE/FALSE if the location reports flu vaccine in stock
+    supply_level_clean = supply_level                                      # numeric / ordinal indicator of how much supply reported
+  ) %>%
+  filter(!is.na(lat), !is.na(lon), !is.na(state))                            # drop rows with missing geolocation / state so maps don't break
+## Reasons to conduct above:
+### selecting the variables that most relavant to the primary question before doing analysis
+### extracting “age eligibility” signals directly from searchable_name because my research question explicitly expected to consider “minimum eligible age.
+### by creating days_since_update leting us discuss supply recency at each site, tying directly to “vaccine supply updates” in the research question.
+### keeping lat, lon, and state, which will be used to check geographic distribution like  mapped site locations by coordinates in previous labs using leaflet/ggplot.
 ```
 
+# 3. Exploratory Analysis
+```{r}
+# 3.1 Dataset size and basic structure (Objective: How big is fluvac and what variables do we have)
+## basic structure, size, and variable types
+fluvac_overview <- tibble(                                                   # create a tibble summarizing structure w/o printing raw head()
+  n_rows         = nrow(fluvac),                                          # total number of provider-location rows
+  n_cols         = ncol(fluvac),                                          # total number of variables/columns
+  last_update_min = min(fluvac$last_update_date, na.rm = TRUE),           # earliest stock timestamp recorded
+  last_update_max = max(fluvac$last_update_date, na.rm = TRUE)            # most recent stock timestamp recorded
+)
+fluvac_overview
+#
+var_names   <- names(fluvac)    # list of variable names
+var_names
+```
 
-# Conclusion:
+```{r}
+# 3.2 Checking categories that being analyzed later
+# EDA: key categorical summaries (provider brand, product type, age group)
+provider_counts <- fluvac %>%
+  count(provider_chain, sort = TRUE) %>%           # how many rows per provider brand/chain
+  mutate(pct = 100 * n / sum(n))                   # share of total locations
+#
+vaccine_type_counts <- fluvac %>%
+  count(vaccine_type, sort = TRUE) %>%             # how many rows per vaccine type label
+  mutate(pct = 100 * n / sum(n))                   # share of total
+#
+age_group_counts <- fluvac %>%
+  count(age_group, sort = TRUE) %>%                # how many rows per inferred eligibility group
+  mutate(pct = 100 * n / sum(n))                   # % of all sites
+vaccine_type_counts
+age_group_counts
+### the output below was used for providing characteristics such as type [≈provider_chain], minimum eligible age [≈age_group], and vaccine supply updates, so need to know if  have enough variation in those variables to analyze.
+```
+```{r}
+# 3.3 numrix summaries with sapply() style (distribution sanity check)
+numeric_vars <- fluvac %>%                                                               # select numeric-ish variables
+  select(days_since_update, supply_level_clean, lat, lon)                                # timing of updates, supply, and coordinates for mapping
+num_summary <- sapply(numeric_vars, summary)                                             # summary() for each numeric variable (Min/1Q/Median/Mean/3Q/Max)
+num_missing <- sapply(numeric_vars, function(x) sum(is.na(x)))                           # number of NAs by numeric variable
+## wrap numeric summary into a nicer long-format table for kable (so no raw console dump):
+num_summary_tbl <- as.data.frame(t(num_summary)) %>%                                     # transpose so each row = variable
+  mutate(var = rownames(.),
+         n_missing = num_missing[ var ]) %>%                                             # attach missing counts per variable
+  relocate(var)
+#
+kable(num_summary_tbl,
+      caption = "Distribution summaries for numeric variables in `fluvac` (with missing counts)") %>%  # publishable numeric summary  #
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped","hover","condensed","responsive")) %>%
+  row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%
+  row_spec(1:nrow(num_summary_tbl), background = c("#efedf5","white"))                                  #
+```
+```{r}
+# 3.4 Visualize basic distributions:
+## distribution of sites per state (bar plot)
+state_counts <- fluvac %>%
+  count(state, name = "num_sites") %>%                           # count locations by 2-letter state
+  arrange(desc(num_sites))                                       # rank states by number of sites
+#
+ggplot(state_counts, aes(x = reorder(state, num_sites), y = num_sites, fill = state)) +
+  geom_col(show.legend = FALSE) +                                # bar height = number of sites
+  coord_flip() +                                                 # flip for readability
+  labs(
+    title = "Number of Flu Vaccine Provider Locations by State", # figure title
+    x = "State / Territory",                                     # x-axis label
+    y = "Number of provider locations"                           # y-axis label
+  ) +
+  theme_minimal(base_size = 12)                                  # clean theme
+### The output below showed states with the highest counts of listed flu vaccine providers include [Top 10: CA, TX, FL, NY, PA,IL,OH,VA,NC,MI], reflecting high retail pharmacy density and population size. States/territories with the fewest listed providers tend to be smaller-population jurisdictions or territories.
+```
+```{r}
+## checking in-stock status and stock recency
+stock_summary <- fluvac %>%
+  mutate(
+    stock_status = if_else(isTRUE(in_stock_flag), "In stock", "Not in stock / Unknown")  # readable flag
+  ) %>%
+  group_by(stock_status) %>%
+  summarise(
+    n_sites = n(),                                                  # number of sites in each status
+    median_days_since_update = median(days_since_update, na.rm=TRUE),  # recency of last reported stock info
+    .groups = "drop"
+  )
+#
+kable(stock_summary,
+      caption = "Stock status & reporting recency across flu vaccine provider locations") %>%
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped","hover","condensed","responsive")) %>%
+  row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%        # styled header like earlier tables
+  row_spec(1:nrow(stock_summary), background = c("#efedf5","white"))           # alternating row colors
+```
+```{r}
+# distribution of days since last stock update
+ggplot(fluvac, aes(x = days_since_update)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7) +   # histogram of reporting freshness   #
+  labs(
+    title = "How recent are vaccine stock updates?",
+    x = "Days since last reported stock quantity",
+    y = "Number of provider locations"
+  ) +
+  theme_minimal(base_size = 12)
+```
+```{r}
+## Violin plot of days_since_update by age_group
+p_violin_age <- ggplot(
+  fluvac,
+  aes(x = age_group, y = days_since_update, fill = age_group)
+) +
+  geom_violin(alpha = 0.5, color = "darkblue") +                                                  # violin shows full distribution shape
+  scale_y_continuous(name = "Days since last stock update") +                             # y-axis label
+  labs(
+    title = "Stock update recency by inferred eligible age group",
+    x = "Inferred eligible age group from vaccine label"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(legend.position = "none")
+p_violin_age
+```
+```{r}
+## Density of days_since_update (freshness overall)
+p_density_fresh <- ggplot(
+  fluvac,
+  aes(x = days_since_update)
+) +
+  geom_density(fill = "#66c", alpha = 0.8) +                                           # smoothed density curve (like your cancer incidence density plot)
+  labs(
+    title = "Overall distribution of stock-report recency",
+    x = "Days since last stock update",
+    y = "Density"
+  ) +
+  theme_minimal(base_size = 11)  
+p_density_fresh
+```
+```{r}
+## Average days_since_update by state (line or lollipop-style)
+state_fresh <- fluvac %>%
+  group_by(state) %>%
+  summarise(mean_days = mean(days_since_update, na.rm = TRUE)) %>%
+  arrange(desc(mean_days))
+#
+p_state_line <- ggplot(
+  state_fresh,
+  aes(x = reorder(state, mean_days), y = mean_days)
+) +
+  geom_point(color = "#54278f", size = 2) +                                               # dot plot showing average recency per state
+  geom_segment(aes(xend = reorder(state, mean_days),
+                   y = 0,
+                   yend = mean_days),
+               color = "#756bb1") +                                                       # lollipop style from 0 up to the point
+  coord_flip() +
+  labs(
+    title = "Average days since last reported stock update, by state",
+    x = "State / Territory",
+    y = "Mean days since update"
+  ) +
+  theme_minimal(base_size = 11)  
+p_state_line
+```
 
+# 4. Preliminary Results
+```{r}
+# 4.1 Results: provider locations per state mapped
+state_counts_map <- fluvac %>%
+  mutate(state_full = tolower(state.name[match(state, state.abb)])) %>%   # convert "CA" -> "california" etc.
+  count(state_full, name = "num_sites")                                   # how many provider locations per state_full
+#
+usa_map <- map_data("state")                                              # polygon coords for lower 48 + AK, HI
+#
+chorodata <- usa_map %>%
+  left_join(state_counts_map, by = c("region" = "state_full"))            # attach counts to map polygons
+#
+ggplot(chorodata, aes(long, lat, group = group, fill = num_sites)) +
+  geom_polygon(color = "white", size = 0.1) +                             # draw each state polygon
+  scale_fill_viridis_c(option = "magma", direction = -1, na.value = "grey90",
+                       name = "Flu provider\nlocations") +                # color scale similar to earlier global maps
+  coord_quickmap() +                                                      # keeps aspect ratio sensible for maps
+  labs(
+    title = "Flu Vaccination Provider Locations per State",
+    subtitle = "Providers listed in Vaccines.gov feed (higher fill = more sites)",
+    x = NULL, y = NULL
+  ) +
+  theme_void() +                                                          # map-focused theme
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5, size = 14),
+    plot.subtitle = element_text(hjust = 0.5, size = 11),
+    legend.title = element_text(face = "bold")
+  )
+```
+## Brief Reports: Provider locations are dense in populous states (e.g., CA, TX, FL, and NY) and more sparse in smaller-population states and certain rural regions. This mirrors what we saw in environmental monitoring site maps, where spatial coverage clusters around populated corridors.The reason of such differences might be states with large urban populations show more listed vaccination sites.
+```{r}
+# 4.2 Point map of all provider locations 
+## quick point map of provider locations (sampled)
+set.seed(12)                                                               # reproducible sample for plotting
+fluvac_sample <- fluvac %>% sample_n(min(10000, n()))                       # take up to 10k points for visualization
 
+usa_states <- map_data("state")                                            # U.S. basemap polygons
 
+ggplot() +
+  geom_polygon(data = usa_states,
+               aes(x = long, y = lat, group = group),
+               fill = "grey95", color = "white", linewidth = 0.2) +        # light gray U.S. map background
+  geom_point(data = fluvac_sample,
+             aes(x = lon, y = lat),
+             alpha = 0.3, size = 0.5, color = "purple4") +                 # purple-ish dots for provider sites
+  coord_quickmap() +
+  labs(
+    title = "Sampled Flu Vaccination Provider Locations in the U.S.",
+    subtitle = "Each point is a listed provider site from Vaccines.gov",
+    x = NULL, y = NULL
+  ) +
+  theme_void() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5)
+  )
+```
+## Brief Reports: The result above revealed the spatial distribution of influenza vaccine provider sites across the United States. A point map representation of sampling provider sites (up to 10,000 locations) illustrated that flu vaccine providers are extensively distributed throughout the country, with much larger densities in highly populated areas, especially along the East Coast, California, Texas, and some sections of the Midwest. In contrast, rural and less densely inhabited regions, such as the Mountain West and some sections of the Great Plains, had a relatively lower number of provider locations. This geographical distribution pattern corresponded with anticipated population and healthcare infrastructure density, indicating increased provider supply in metropolitan areas where demand is greatest. infrastructure patterns.
+```{r}
+# 4.3 Results: Minimum eligible age: looking at what fraction of locations explicitly advertise high-dose/adjuvanted doses for adults 65+ vs. general flu shots vs. nasal spray (often pediatrics/younger adults):
+age_mix <- fluvac %>%
+  group_by(age_group) %>%                                            # "65_plus", "younger_adult_child", "all_ages_general"
+  summarise(
+    n_sites = n(),                                                   # number of sites offering that product type
+    pct_sites = 100 * n_sites / nrow(fluvac),                        # share of all sites
+    .groups = "drop"
+  )
+#
+kable(age_mix,
+      caption = "Flu Vaccine Eligibility Focus (based on product labeling at site)") %>%
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped","hover","condensed","responsive")) %>%
+  row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%
+  row_spec(1:nrow(age_mix), background = c("#efedf5","white"))
+```
+## Brief Reports: A substantial fraction of listed locations explicitly offer senior-focused formulations (‘65+’, high-dose or adjuvanted vaccines) (about 31%). This result may highlight targeted access for older adults, a high-risk group for severe influenza outcomes. Additionally, most locations advertise a general ‘Flu Shot’, assumed to cover standard quadrivalent inactivated influenza vaccine for the general population (6 months+).
+```{r}
+# 4.4. Within-State Market Share of Flu Vaccination Providers in the United States
+dominance_share <- fluvac %>%
+  group_by(state) %>%
+  mutate(state_total_sites = n()) %>%                                      # total sites in that state
+  ungroup() %>%
+  group_by(state, provider_chain) %>%
+  summarise(
+    n_sites = n(),
+    state_total_sites = first(state_total_sites),
+    share_pct = 100 * n_sites / state_total_sites,                          # % share of listings in that state for that chain
+    .groups = "drop"
+  ) %>%
+  arrange(desc(share_pct)) %>%
+  group_by(state) %>%
+  slice_max(order_by = share_pct, n = 1, with_ties = FALSE) %>%             # which chain has highest within-state share %
+  ungroup()
+#
+kable(dominance_share,
+      caption = "Within-state market share: which chain accounts for the largest share of listed flu vaccine locations in each state?") %>%
+  kable_styling(full_width = FALSE, position = "center",
+                bootstrap_options = c("striped","hover","condensed","responsive")) %>%
+  row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%
+  row_spec(1:nrow(dominance_share), background = c("#efedf5","white"))      #
+```
+## Brief Reports:The analysis of intra-state market share revealed that major retail pharmacy chains, notably Walmart, CVS, Walgreens, and Safeway, often represented the predominant proportion of designated influenza vaccine provider locations in several states. Walgreens constituted 100% of the reported locations in the U.S. Virgin Islands.
 
-
-
-
-
+# 5. Conclusion:According to the U.S. Centers for Disease Control and Prevention (CDC) via the Vaccines.gov platform, flu vaccine provider sites were extensively scattered across the United States, exhibiting distinct geographic and provider-related trends. The maps showed concentrated clusters in densely populated regions, like the East Coast corridor, California, Texas, and Florida, but rural areas in the Mountain West and Upper Plains have less coverage, indicating differences in access related to population density. Market share analysis indicates that major retail chains like Walmart, CVS, and Walgreens frequently constitute the largest share of locations within states. Concerning provider characteristics, the majority of sites cater to the general public, around one-third specifically promote vaccinations for older persons (65+), and a very minor percentage concentrate on pediatric or younger adult demographics. The findings indicated that general adult access is widely available, older adults are adequately served in numerous locations, yet child-focused vaccination options are scarce, underscoring the necessity for targeted strategies to enhance equity in flu vaccination access, particularly in rural regions and for pediatric populations.
