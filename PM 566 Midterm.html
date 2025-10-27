@@ -2393,6 +2393,7 @@ border: 0;
 </style>
 
 
+<link rel="stylesheet" href="style.css">
 </head>
 
 <body class="fullcontent quarto-light">
@@ -2496,31 +2497,30 @@ The following object is masked from &#39;package:purrr&#39;:
 <span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="do">## days_since_update: how stale the stock info is (use Sys.Date() for “today”)</span></span>
 <span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="do">## state / lat / lon kept for mapping</span></span>
 <span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a><span class="do">## in_stock_flag and supply_level for availability</span></span>
-<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Data Prep: create cleaned analytic dataset</span></span>
-<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- Data Prep: create cleaned analytic dataset</span></span>
-<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>fluvac <span class="ot">&lt;-</span> fluvacall <span class="sc">%&gt;%</span>                                                   <span class="co"># start with raw data</span></span>
-<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">provider_chain =</span> <span class="fu">str_squish</span>(loc_name),                                  <span class="co"># collapse extra spaces in provider name</span></span>
-<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">vaccine_type   =</span> <span class="fu">str_squish</span>(searchable_name),                            <span class="co"># human-readable vaccine label such as &quot;Flu Shot&quot;, &quot;Flu Shot&quot;</span></span>
-<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_group      =</span> <span class="fu">if_else</span>(<span class="fu">str_detect</span>(searchable_name, <span class="st">&quot;65</span><span class="sc">\\</span><span class="st">+&quot;</span>),                               </span>
-<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;65_plus&quot;</span>,           <span class="co"># pull explicit age info if mentioned (e.g. &quot;65+&quot;)</span></span>
-<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>                       <span class="fu">if_else</span>(<span class="fu">str_detect</span>(searchable_name, <span class="st">&quot;Nasal Spray&quot;</span>),  <span class="co"># nasal spray often used for younger, generally healthy non-pregnant &lt;50</span></span>
-<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;younger_adult_child&quot;</span>,</span>
-<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;all_ages_general&quot;</span>)),                          <span class="co"># fallback if not specifically flagged</span></span>
-<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">last_update_date =</span> <span class="fu">suppressWarnings</span>(lubridate<span class="sc">::</span><span class="fu">ymd</span>(quantity_last_updated)),  <span class="co"># parse last stock update &quot;YYYY-MM-DD&quot; string into Date</span></span>
-<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">days_since_update =</span> <span class="fu">as.numeric</span>(<span class="fu">Sys.Date</span>() <span class="sc">-</span> last_update_date),          <span class="co"># how many days since that location last reported stock, proxy for freshness</span></span>
-<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">state =</span> loc_admin_state,                                                <span class="co"># 2-letter state / territory code (e.g. &quot;CA&quot;, &quot;MA&quot;,&quot;NC&quot;)</span></span>
-<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">lat =</span> latitude,                                                         <span class="co"># latitude coordinate for mapping</span></span>
-<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">lon =</span> longitude,                                                        <span class="co"># longitude coordinate for mapping</span></span>
-<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">in_stock_flag =</span> in_stock,                                               <span class="co"># TRUE/FALSE if the location reports flu vaccine in stock</span></span>
-<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">supply_level_clean =</span> supply_level                                      <span class="co"># numeric / ordinal indicator of how much supply reported</span></span>
-<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(lat), <span class="sc">!</span><span class="fu">is.na</span>(lon), <span class="sc">!</span><span class="fu">is.na</span>(state))                            <span class="co"># drop rows with missing geolocation / state so maps don&#39;t break</span></span>
-<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="do">## Reasons to conduct above:</span></span>
-<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="do">### selecting the variables that most relavant to the primary question before doing analysis</span></span>
-<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="do">### extracting “age eligibility” signals directly from searchable_name because my research question explicitly expected to consider “minimum eligible age.</span></span>
-<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="do">### by creating days_since_update leting us discuss supply recency at each site, tying directly to “vaccine supply updates” in the research question.</span></span>
-<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="do">### keeping lat, lon, and state, which will be used to check geographic distribution like  mapped site locations by coordinates in previous labs using leaflet/ggplot.</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co">#Data Prep: create cleaned analytic dataset</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>fluvac <span class="ot">&lt;-</span> fluvacall <span class="sc">%&gt;%</span>                                                   <span class="co"># start with raw data</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">provider_chain =</span> <span class="fu">str_squish</span>(loc_name),                                  <span class="co"># collapse extra spaces in provider name</span></span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">vaccine_type   =</span> <span class="fu">str_squish</span>(searchable_name),                            <span class="co"># human-readable vaccine label such as &quot;Flu Shot&quot;, &quot;Flu Shot&quot;</span></span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">age_group      =</span> <span class="fu">if_else</span>(<span class="fu">str_detect</span>(searchable_name, <span class="st">&quot;65</span><span class="sc">\\</span><span class="st">+&quot;</span>),                               </span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;65_plus&quot;</span>,           <span class="co"># pull explicit age info if mentioned (e.g. &quot;65+&quot;)</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>                       <span class="fu">if_else</span>(<span class="fu">str_detect</span>(searchable_name, <span class="st">&quot;Nasal Spray&quot;</span>),  <span class="co"># nasal spray often used for younger, generally healthy non-pregnant &lt;50</span></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;younger_adult_child&quot;</span>,</span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>                              <span class="st">&quot;all_ages_general&quot;</span>)),                          <span class="co"># fallback if not specifically flagged</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">last_update_date =</span> <span class="fu">suppressWarnings</span>(lubridate<span class="sc">::</span><span class="fu">ymd</span>(quantity_last_updated)),  <span class="co"># parse last stock update &quot;YYYY-MM-DD&quot; string into Date</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">days_since_update =</span> <span class="fu">as.numeric</span>(<span class="fu">Sys.Date</span>() <span class="sc">-</span> last_update_date),          <span class="co"># how many days since that location last reported stock, proxy for freshness</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">state =</span> loc_admin_state,                                                <span class="co"># 2-letter state / territory code (e.g. &quot;CA&quot;, &quot;MA&quot;,&quot;NC&quot;)</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">lat =</span> latitude,                                                         <span class="co"># latitude coordinate for mapping</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">lon =</span> longitude,                                                        <span class="co"># longitude coordinate for mapping</span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">in_stock_flag =</span> in_stock,                                               <span class="co"># TRUE/FALSE if the location reports flu vaccine in stock</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">supply_level_clean =</span> supply_level                                      <span class="co"># numeric / ordinal indicator of how much supply reported</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(lat), <span class="sc">!</span><span class="fu">is.na</span>(lon), <span class="sc">!</span><span class="fu">is.na</span>(state))                            <span class="co"># drop rows with missing geolocation / state so maps don&#39;t break</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="do">## Reasons to conduct above:</span></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="do">### selecting the variables that most relavant to the primary question before doing analysis</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="do">### extracting “age eligibility” signals directly from searchable_name because my research question explicitly expected to consider “minimum eligible age.</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="do">### by creating days_since_update leting us discuss supply recency at each site, tying directly to “vaccine supply updates” in the research question.</span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="do">### keeping lat, lon, and state, which will be used to check geographic distribution like  mapped site locations by coordinates in previous labs using leaflet/ggplot.</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="exploratory-analysis" class="level1">
@@ -2591,28 +2591,28 @@ The following object is masked from &#39;package:purrr&#39;:
 </div>
 <div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="do">### the output below was used for providing characteristics such as type [≈provider_chain], minimum eligible age [≈age_group], and vaccine supply updates, so need to know if  have enough variation in those variables to analyze.</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<section id="brief-description-the-aforementioned-results-indicated-that-the-predominant-percentage-of-flu-vaccination-sites-publicize-availability-for-the-general-populace-65.0-followed-by-a-significant-portion-aimed-specifically-at-adults-aged-65-and-older-31.0-while-a-mere-minority-4.0-explicitly-advertised-eligibility-for-younger-adults-or-children-highlighting-a-provider-emphasis-on-widespread-accessibility-with-an-additional-focus-on-older-adults." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-aforementioned-results-indicated-that-the-predominant-percentage-of-flu-vaccination-sites-publicize-availability-for-the-general-populace-65.0-followed-by-a-significant-portion-aimed-specifically-at-adults-aged-65-and-older-31.0-while-a-mere-minority-4.0-explicitly-advertised-eligibility-for-younger-adults-or-children-highlighting-a-provider-emphasis-on-widespread-accessibility-with-an-additional-focus-on-older-adults.">Brief description: The aforementioned results indicated that the predominant percentage of flu vaccination sites publicize availability for the general populace (65.0%), followed by a significant portion aimed specifically at adults aged 65 and older (31.0%), while a mere minority (4.0%) explicitly advertised eligibility for younger adults or children, highlighting a provider emphasis on widespread accessibility with an additional focus on older adults.</h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.3 numrix summaries with sapply() style (distribution sanity check)</span></span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>numeric_vars <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span>                                                               <span class="co"># select numeric-ish variables</span></span>
 <span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(days_since_update, supply_level_clean, lat, lon)                                <span class="co"># timing of updates, supply, and coordinates for mapping</span></span>
 <span id="cb19-4"><a href="#cb19-4" aria-hidden="true" tabindex="-1"></a>num_summary <span class="ot">&lt;-</span> <span class="fu">sapply</span>(numeric_vars, summary)                                             <span class="co"># summary() for each numeric variable (Min/1Q/Median/Mean/3Q/Max)</span></span>
-<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a>num_missing <span class="ot">&lt;-</span> <span class="fu">sapply</span>(numeric_vars, <span class="cf">function</span>(x) <span class="fu">sum</span>(<span class="fu">is.na</span>(x)))                           <span class="co"># number of NAs by numeric variable</span></span>
-<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a><span class="do">## wrap numeric summary into a nicer long-format table for kable (so no raw console dump):</span></span>
-<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>num_summary_tbl <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">t</span>(num_summary)) <span class="sc">%&gt;%</span>                                     <span class="co"># transpose so each row = variable</span></span>
-<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">var =</span> <span class="fu">rownames</span>(.),</span>
-<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">n_missing =</span> num_missing[ var ]) <span class="sc">%&gt;%</span>                                             <span class="co"># attach missing counts per variable</span></span>
-<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(var)</span>
-<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(num_summary_tbl,</span>
-<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Distribution summaries for numeric variables in `fluvac` (with missing counts)&quot;</span>) <span class="sc">%&gt;%</span>  <span class="co"># publishable numeric summary  #</span></span>
-<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
-<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb19-17"><a href="#cb19-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(num_summary_tbl), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))                                  <span class="co">#</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb19-5"><a href="#cb19-5" aria-hidden="true" tabindex="-1"></a><span class="do">## wrap numeric summary into a nicer long-format table for kable (so no raw console dump):</span></span>
+<span id="cb19-6"><a href="#cb19-6" aria-hidden="true" tabindex="-1"></a>num_summary_tbl <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">t</span>(num_summary)) <span class="sc">%&gt;%</span>                                     <span class="co"># transpose so each row = variable</span></span>
+<span id="cb19-7"><a href="#cb19-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">var =</span> <span class="fu">rownames</span>(.)) <span class="sc">%&gt;%</span>                                             <span class="co"># attach missing counts per variable</span></span>
+<span id="cb19-8"><a href="#cb19-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">relocate</span>(var)</span>
+<span id="cb19-9"><a href="#cb19-9" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb19-10"><a href="#cb19-10" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(num_summary_tbl,</span>
+<span id="cb19-11"><a href="#cb19-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Distribution summaries for numeric variables in `fluvac`&quot;</span>) <span class="sc">%&gt;%</span>  <span class="co"># publishable numeric summary  #</span></span>
+<span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
+<span id="cb19-13"><a href="#cb19-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb19-14"><a href="#cb19-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb19-15"><a href="#cb19-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(num_summary_tbl), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))                                  <span class="co">#</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div class="table-responsive">
 <table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
-<caption>Distribution summaries for numeric variables in `fluvac` (with missing counts)</caption>
+<caption>Distribution summaries for numeric variables in `fluvac`</caption>
 <thead>
 <tr class="header">
 <th data-quarto-table-cell-role="th" style="text-align: left; font-weight: bold; color: white !important; background-color: rgba(117, 107, 177, 255) !important;"></th>
@@ -2623,7 +2623,6 @@ The following object is masked from &#39;package:purrr&#39;:
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold; color: white !important; background-color: rgba(117, 107, 177, 255) !important;">Mean</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold; color: white !important; background-color: rgba(117, 107, 177, 255) !important;">3rd Qu.</th>
 <th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold; color: white !important; background-color: rgba(117, 107, 177, 255) !important;">Max.</th>
-<th data-quarto-table-cell-role="th" style="text-align: right; font-weight: bold; color: white !important; background-color: rgba(117, 107, 177, 255) !important;">n_missing</th>
 </tr>
 </thead>
 <tbody>
@@ -2636,7 +2635,6 @@ The following object is masked from &#39;package:purrr&#39;:
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">498.636701</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">571.00000</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">801.00000</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0</td>
 </tr>
 <tr class="even">
 <td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">supply_level_clean</td>
@@ -2647,7 +2645,6 @@ The following object is masked from &#39;package:purrr&#39;:
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0.024393</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0.00000</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">4.00000</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0</td>
 </tr>
 <tr class="odd">
 <td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">lat</td>
@@ -2658,7 +2655,6 @@ The following object is masked from &#39;package:purrr&#39;:
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">37.397446</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">41.31921</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">71.29726</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0</td>
 </tr>
 <tr class="even">
 <td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">lon</td>
@@ -2669,13 +2665,15 @@ The following object is masked from &#39;package:purrr&#39;:
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">-90.829963</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">-78.69288</td>
 <td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">-64.88893</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">0</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
+</section>
+<section id="brief-description-the-results-indicated-that-although-geographic-coordinates-latitude-and-longitude-correspond-with-the-anticipated-range-of-u.s.-provider-locations-the-variable-days-since-update-displayed-a-broad-distribution-median-454-days-maximum-800-days-implying-potential-issues-regarding-data-timeliness.-additionally-the-supply-level-variable-demonstrates-minimal-variation-which-may-limit-its-interpretability-in-epidemiological-analyses." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-results-indicated-that-although-geographic-coordinates-latitude-and-longitude-correspond-with-the-anticipated-range-of-u.s.-provider-locations-the-variable-days-since-update-displayed-a-broad-distribution-median-454-days-maximum-800-days-implying-potential-issues-regarding-data-timeliness.-additionally-the-supply-level-variable-demonstrates-minimal-variation-which-may-limit-its-interpretability-in-epidemiological-analyses.">Brief description: The results indicated that although geographic coordinates (latitude and longitude) correspond with the anticipated range of U.S. provider locations, the variable days since update displayed a broad distribution (median ≈454 days, maximum &gt;800 days), implying potential issues regarding data timeliness. Additionally, the supply level variable demonstrates minimal variation, which may limit its interpretability in epidemiological analyses.</h2>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 3.4 Visualize basic distributions:</span></span>
 <span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a><span class="do">## distribution of sites per state (bar plot)</span></span>
@@ -2699,27 +2697,60 @@ The following object is masked from &#39;package:purrr&#39;:
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="do">### The output below showed states with the highest counts of listed flu vaccine providers include [Top 10: CA, TX, FL, NY, PA,IL,OH,VA,NC,MI], reflecting high retail pharmacy density and population size. States/territories with the fewest listed providers tend to be smaller-population jurisdictions or territories.</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</section>
+<section id="brief-description-the-output-below-showed-states-with-the-highest-counts-of-listed-flu-vaccine-providers-include-top-10-ca-tx-fl-ny-pailohvancmi-reflecting-high-retail-pharmacy-density-and-population-size.-statesterritories-with-the-fewest-listed-providers-tend-to-be-smaller-population-jurisdictions-or-territories." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-output-below-showed-states-with-the-highest-counts-of-listed-flu-vaccine-providers-include-top-10-ca-tx-fl-ny-pailohvancmi-reflecting-high-retail-pharmacy-density-and-population-size.-statesterritories-with-the-fewest-listed-providers-tend-to-be-smaller-population-jurisdictions-or-territories.">Brief description: The output below showed states with the highest counts of listed flu vaccine providers include [Top 10: CA, TX, FL, NY, PA,IL,OH,VA,NC,MI], reflecting high retail pharmacy density and population size. States/territories with the fewest listed providers tend to be smaller-population jurisdictions or territories.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="do">## checking in-stock status and stock recency</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>stock_summary <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">stock_status =</span> <span class="fu">if_else</span>(<span class="fu">isTRUE</span>(in_stock_flag), <span class="st">&quot;In stock&quot;</span>, <span class="st">&quot;Not in stock / Unknown&quot;</span>)  <span class="co"># readable flag</span></span>
-<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(stock_status) <span class="sc">%&gt;%</span></span>
-<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),                                                  <span class="co"># number of sites in each status</span></span>
-<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">median_days_since_update =</span> <span class="fu">median</span>(days_since_update, <span class="at">na.rm=</span><span class="cn">TRUE</span>),  <span class="co"># recency of last reported stock info</span></span>
-<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
-<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(stock_summary,</span>
-<span id="cb22-14"><a href="#cb22-14" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Stock status &amp; reporting recency across flu vaccine provider locations&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb22-15"><a href="#cb22-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
-<span id="cb22-16"><a href="#cb22-16" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb22-17"><a href="#cb22-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span>        <span class="co"># styled header like earlier tables</span></span>
-<span id="cb22-18"><a href="#cb22-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(stock_summary), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))           <span class="co"># alternating row colors</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="do">## checking in-stock status and stock recency</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>stock_summary <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 1. Coerce in_stock_flag into a clean logical variable                  #</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">in_stock_clean =</span> <span class="fu">case_when</span>(</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>      <span class="co"># if it&#39;s already logical TRUE/FALSE, keep it                              #</span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>      in_stock_flag <span class="sc">%in%</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>) <span class="sc">~</span> <span class="fu">as.logical</span>(in_stock_flag),             </span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>      <span class="co"># if it&#39;s &quot;true&quot;/&quot;false&quot; as character or factor, convert to logical        #</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a>      <span class="fu">str_to_lower</span>(<span class="fu">str_trim</span>(<span class="fu">as.character</span>(in_stock_flag))) <span class="sc">==</span> <span class="st">&quot;true&quot;</span>  <span class="sc">~</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a>      <span class="fu">str_to_lower</span>(<span class="fu">str_trim</span>(<span class="fu">as.character</span>(in_stock_flag))) <span class="sc">==</span> <span class="st">&quot;false&quot;</span> <span class="sc">~</span> <span class="cn">FALSE</span>,</span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a>      <span class="co"># anything else becomes NA (shouldn&#39;t matter if you truly have no NA)     #</span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a>      <span class="cn">TRUE</span> <span class="sc">~</span> <span class="cn">NA</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a>    <span class="co"># Step 2. Human-readable label for reporting                                 #</span></span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">stock_status =</span> <span class="fu">if_else</span>(</span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a>      in_stock_clean <span class="sc">%in%</span> <span class="cn">TRUE</span>,                      <span class="co"># rowwise: is this location in stock?         #</span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a>      <span class="st">&quot;In stock&quot;</span>,                                    <span class="co"># label if TRUE                                #</span></span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a>      <span class="st">&quot;Not in stock&quot;</span>                                 <span class="co"># label if FALSE or NA                         #</span></span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(stock_status) <span class="sc">%&gt;%</span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),                                                   <span class="co"># number of locations in each status category          #</span></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">median_days_since_update =</span> <span class="fu">median</span>(days_since_update, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="co"># typical recency of supply reporting (days)        #</span></span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(</span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a>  stock_summary,</span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a>  <span class="at">caption =</span> <span class="st">&quot;Stock status &amp; reporting recency across flu vaccine provider locations&quot;</span></span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(</span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a>    <span class="at">full_width =</span> <span class="cn">FALSE</span>,</span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a>    <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a>    <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)</span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(</span>
+<span id="cb21-41"><a href="#cb21-41" aria-hidden="true" tabindex="-1"></a>    <span class="dv">0</span>,</span>
+<span id="cb21-42"><a href="#cb21-42" aria-hidden="true" tabindex="-1"></a>    <span class="at">bold =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb21-43"><a href="#cb21-43" aria-hidden="true" tabindex="-1"></a>    <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>,</span>
+<span id="cb21-44"><a href="#cb21-44" aria-hidden="true" tabindex="-1"></a>    <span class="at">color =</span> <span class="st">&quot;white&quot;</span></span>
+<span id="cb21-45"><a href="#cb21-45" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb21-46"><a href="#cb21-46" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(</span>
+<span id="cb21-47"><a href="#cb21-47" aria-hidden="true" tabindex="-1"></a>    <span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(stock_summary),</span>
+<span id="cb21-48"><a href="#cb21-48" aria-hidden="true" tabindex="-1"></a>    <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>)</span>
+<span id="cb21-49"><a href="#cb21-49" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div class="table-responsive">
 <table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
@@ -2733,25 +2764,33 @@ The following object is masked from &#39;package:purrr&#39;:
 </thead>
 <tbody>
 <tr class="odd">
-<td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">Not in stock / Unknown</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">202640</td>
-<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">454</td>
+<td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">In stock</td>
+<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">49713</td>
+<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">571</td>
+</tr>
+<tr class="even">
+<td style="text-align: left; background-color: rgba(239, 237, 245, 255) !important;">Not in stock</td>
+<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">152927</td>
+<td style="text-align: right; background-color: rgba(239, 237, 245, 255) !important;">451</td>
 </tr>
 </tbody>
 </table>
 </div>
 </div>
 </div>
+</section>
+<section id="brief-description-the-results-showed-that-approximately-24.5-49713-locations-of-flu-vaccine-providers-reported-being-in-stock-with-a-median-reporting-recency-of-571-days.-in-contrast-the-majority-152927-locations-were-classified-as-not-in-stock-with-a-median-reporting-recency-of-451-days-underscoring-significant-variability-and-potential-delays-in-stock-status-updates-among-sites." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-results-showed-that-approximately-24.5-49713-locations-of-flu-vaccine-providers-reported-being-in-stock-with-a-median-reporting-recency-of-571-days.-in-contrast-the-majority-152927-locations-were-classified-as-not-in-stock-with-a-median-reporting-recency-of-451-days-underscoring-significant-variability-and-potential-delays-in-stock-status-updates-among-sites.">Brief description: The results showed that approximately 24.5% (49,713 locations) of flu vaccine providers reported being in stock, with a median reporting recency of 571 days. In contrast, the majority (152,927 locations) were classified as not in stock, with a median reporting recency of 451 days, underscoring significant variability and potential delays in stock status updates among sites.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="co"># distribution of days since last stock update</span></span>
-<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fluvac, <span class="fu">aes</span>(<span class="at">x =</span> days_since_update)) <span class="sc">+</span></span>
-<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">30</span>, <span class="at">fill =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.7</span>) <span class="sc">+</span>   <span class="co"># histogram of reporting freshness   #</span></span>
-<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;How recent are vaccine stock updates?&quot;</span>,</span>
-<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Days since last reported stock quantity&quot;</span>,</span>
-<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Number of provider locations&quot;</span></span>
-<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="co"># distribution of days since last stock update</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(fluvac, <span class="fu">aes</span>(<span class="at">x =</span> days_since_update)) <span class="sc">+</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_histogram</span>(<span class="at">bins =</span> <span class="dv">30</span>, <span class="at">fill =</span> <span class="st">&quot;steelblue&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.7</span>) <span class="sc">+</span>   <span class="co"># histogram of reporting freshness   #</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;How recent are vaccine stock updates?&quot;</span>,</span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Days since last reported stock quantity&quot;</span>,</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Number of provider locations&quot;</span></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">12</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -2760,21 +2799,24 @@ The following object is masked from &#39;package:purrr&#39;:
 </div>
 </div>
 </div>
+</section>
+<section id="brief-descriptionthe-histogram-revealed-that-most-flu-vaccine-supplier-locations-had-not-refreshed-their-stock-status-for-several-hundred-days-particularly-clustered-around-450600-days-indicating-a-lack-of-recent-updates-and-likely-deficiencies-in-the-timely-reporting-of-vaccine-availability." class="level2">
+<h2 class="anchored" data-anchor-id="brief-descriptionthe-histogram-revealed-that-most-flu-vaccine-supplier-locations-had-not-refreshed-their-stock-status-for-several-hundred-days-particularly-clustered-around-450600-days-indicating-a-lack-of-recent-updates-and-likely-deficiencies-in-the-timely-reporting-of-vaccine-availability.">Brief description:The histogram revealed that most flu vaccine supplier locations had not refreshed their stock status for several hundred days, particularly clustered around 450–600 days, indicating a lack of recent updates and likely deficiencies in the timely reporting of vaccine availability.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Violin plot of days_since_update by age_group</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>p_violin_age <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  fluvac,</span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> age_group, <span class="at">y =</span> days_since_update, <span class="at">fill =</span> age_group)</span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_violin</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">&quot;darkblue&quot;</span>) <span class="sc">+</span>                                                  <span class="co"># violin shows full distribution shape</span></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">name =</span> <span class="st">&quot;Days since last stock update&quot;</span>) <span class="sc">+</span>                             <span class="co"># y-axis label</span></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Stock update recency by inferred eligible age group&quot;</span>,</span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Inferred eligible age group from vaccine label&quot;</span></span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>) <span class="sc">+</span></span>
-<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span>)</span>
-<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>p_violin_age</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Violin plot of days_since_update by age_group</span></span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>p_violin_age <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  fluvac,</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> age_group, <span class="at">y =</span> days_since_update, <span class="at">fill =</span> age_group)</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_violin</span>(<span class="at">alpha =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">&quot;darkblue&quot;</span>) <span class="sc">+</span>                                                  <span class="co"># violin shows full distribution shape</span></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_continuous</span>(<span class="at">name =</span> <span class="st">&quot;Days since last stock update&quot;</span>) <span class="sc">+</span>                             <span class="co"># y-axis label</span></span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Stock update recency by inferred eligible age group&quot;</span>,</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Inferred eligible age group from vaccine label&quot;</span></span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>) <span class="sc">+</span></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">&quot;none&quot;</span>)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>p_violin_age</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -2783,20 +2825,23 @@ The following object is masked from &#39;package:purrr&#39;:
 </div>
 </div>
 </div>
+</section>
+<section id="brief-description-the-violin-plot-illustrated-that-across-all-estimated-eligible-age-categories-65-all-ages-and-younger-populations-stock-updates-are-comparably-old-with-elongated-right-skewed-distributions-indicating-considerable-delays-in-the-latest-reporting-of-vaccination-availability." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-violin-plot-illustrated-that-across-all-estimated-eligible-age-categories-65-all-ages-and-younger-populations-stock-updates-are-comparably-old-with-elongated-right-skewed-distributions-indicating-considerable-delays-in-the-latest-reporting-of-vaccination-availability.">Brief description: The violin plot illustrated that across all estimated eligible age categories (65+, all ages, and younger populations), stock updates are comparably old, with elongated right-skewed distributions indicating considerable delays in the latest reporting of vaccination availability.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Density of days_since_update (freshness overall)</span></span>
-<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>p_density_fresh <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
-<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  fluvac,</span>
-<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> days_since_update)</span>
-<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_density</span>(<span class="at">fill =</span> <span class="st">&quot;#66c&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.8</span>) <span class="sc">+</span>                                           <span class="co"># smoothed density curve (like your cancer incidence density plot)</span></span>
-<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Overall distribution of stock-report recency&quot;</span>,</span>
-<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Days since last stock update&quot;</span>,</span>
-<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Density&quot;</span></span>
-<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>)  </span>
-<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>p_density_fresh</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Density of days_since_update (freshness overall)</span></span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>p_density_fresh <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  fluvac,</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> days_since_update)</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_density</span>(<span class="at">fill =</span> <span class="st">&quot;#66c&quot;</span>, <span class="at">alpha =</span> <span class="fl">0.8</span>) <span class="sc">+</span>                                           <span class="co"># smoothed density curve (like your cancer incidence density plot)</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Overall distribution of stock-report recency&quot;</span>,</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;Days since last stock update&quot;</span>,</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Density&quot;</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>)  </span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>p_density_fresh</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -2805,30 +2850,33 @@ The following object is masked from &#39;package:purrr&#39;:
 </div>
 </div>
 </div>
+</section>
+<section id="brief-description-the-density-map-revealed-that-most-flu-vaccine-supplier-sites-had-not-refreshed-stock-information-for-several-hundred-days-with-significant-peaks-at-450-and-570-days-underscoring-considerable-delays-in-reporting-recency-across-several-locales." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-density-map-revealed-that-most-flu-vaccine-supplier-sites-had-not-refreshed-stock-information-for-several-hundred-days-with-significant-peaks-at-450-and-570-days-underscoring-considerable-delays-in-reporting-recency-across-several-locales.">Brief description: The density map revealed that most flu vaccine supplier sites had not refreshed stock information for several hundred days, with significant peaks at 450 and 570 days, underscoring considerable delays in reporting recency across several locales.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Average days_since_update by state (line or lollipop-style)</span></span>
-<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>state_fresh <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
-<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
-<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mean_days =</span> <span class="fu">mean</span>(days_since_update, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(mean_days))</span>
-<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>p_state_line <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
-<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  state_fresh,</span>
-<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">reorder</span>(state, mean_days), <span class="at">y =</span> mean_days)</span>
-<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
-<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">color =</span> <span class="st">&quot;#54278f&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span>                                               <span class="co"># dot plot showing average recency per state</span></span>
-<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_segment</span>(<span class="fu">aes</span>(<span class="at">xend =</span> <span class="fu">reorder</span>(state, mean_days),</span>
-<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>                   <span class="at">y =</span> <span class="dv">0</span>,</span>
-<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>                   <span class="at">yend =</span> mean_days),</span>
-<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>               <span class="at">color =</span> <span class="st">&quot;#756bb1&quot;</span>) <span class="sc">+</span>                                                       <span class="co"># lollipop style from 0 up to the point</span></span>
-<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
-<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Average days since last reported stock update, by state&quot;</span>,</span>
-<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;State / Territory&quot;</span>,</span>
-<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Mean days since update&quot;</span></span>
-<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>)  </span>
-<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>p_state_line</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="do">## Average days_since_update by state (line or lollipop-style)</span></span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>state_fresh <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">mean_days =</span> <span class="fu">mean</span>(days_since_update, <span class="at">na.rm =</span> <span class="cn">TRUE</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(mean_days))</span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>p_state_line <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>  state_fresh,</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">reorder</span>(state, mean_days), <span class="at">y =</span> mean_days)</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>) <span class="sc">+</span></span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">color =</span> <span class="st">&quot;#54278f&quot;</span>, <span class="at">size =</span> <span class="dv">2</span>) <span class="sc">+</span>                                               <span class="co"># dot plot showing average recency per state</span></span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_segment</span>(<span class="fu">aes</span>(<span class="at">xend =</span> <span class="fu">reorder</span>(state, mean_days),</span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>                   <span class="at">y =</span> <span class="dv">0</span>,</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>                   <span class="at">yend =</span> mean_days),</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>               <span class="at">color =</span> <span class="st">&quot;#756bb1&quot;</span>) <span class="sc">+</span>                                                       <span class="co"># lollipop style from 0 up to the point</span></span>
+<span id="cb25-16"><a href="#cb25-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb25-17"><a href="#cb25-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb25-18"><a href="#cb25-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Average days since last reported stock update, by state&quot;</span>,</span>
+<span id="cb25-19"><a href="#cb25-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">&quot;State / Territory&quot;</span>,</span>
+<span id="cb25-20"><a href="#cb25-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">y =</span> <span class="st">&quot;Mean days since update&quot;</span></span>
+<span id="cb25-21"><a href="#cb25-21" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb25-22"><a href="#cb25-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">11</span>)  </span>
+<span id="cb25-23"><a href="#cb25-23" aria-hidden="true" tabindex="-1"></a>p_state_line</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -2838,35 +2886,39 @@ The following object is masked from &#39;package:purrr&#39;:
 </div>
 </div>
 </section>
+<section id="brief-description-the-figure-depicted-the-average-duration-since-the-last-reported-influenza-vaccine-stock-update-by-u.s.-state-revealing-significant-variation-among-states-with-the-majority-falling-within-the-range-of-approximately-450500-days-thereby-underscoring-discrepancies-in-reporting-timeliness-that-may-indicate-differences-in-provider-practices-or-state-level-surveillance-systems." class="level2">
+<h2 class="anchored" data-anchor-id="brief-description-the-figure-depicted-the-average-duration-since-the-last-reported-influenza-vaccine-stock-update-by-u.s.-state-revealing-significant-variation-among-states-with-the-majority-falling-within-the-range-of-approximately-450500-days-thereby-underscoring-discrepancies-in-reporting-timeliness-that-may-indicate-differences-in-provider-practices-or-state-level-surveillance-systems.">Brief description: The figure depicted the average duration since the last reported influenza vaccine stock update by U.S. state, revealing significant variation among states, with the majority falling within the range of approximately 450–500 days, thereby underscoring discrepancies in reporting timeliness that may indicate differences in provider practices or state-level surveillance systems.</h2>
+</section>
+</section>
 <section id="preliminary-results" class="level1">
 <h1>4. Preliminary Results</h1>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.1 Results: provider locations per state mapped</span></span>
-<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>state_counts_map <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
-<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">state_full =</span> <span class="fu">tolower</span>(state.name[<span class="fu">match</span>(state, state.abb)])) <span class="sc">%&gt;%</span>   <span class="co"># convert &quot;CA&quot; -&gt; &quot;california&quot; etc.</span></span>
-<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(state_full, <span class="at">name =</span> <span class="st">&quot;num_sites&quot;</span>)                                   <span class="co"># how many provider locations per state_full</span></span>
-<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>usa_map <span class="ot">&lt;-</span> <span class="fu">map_data</span>(<span class="st">&quot;state&quot;</span>)                                              <span class="co"># polygon coords for lower 48 + AK, HI</span></span>
-<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>chorodata <span class="ot">&lt;-</span> usa_map <span class="sc">%&gt;%</span></span>
-<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(state_counts_map, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;region&quot;</span> <span class="ot">=</span> <span class="st">&quot;state_full&quot;</span>))            <span class="co"># attach counts to map polygons</span></span>
-<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(chorodata, <span class="fu">aes</span>(long, lat, <span class="at">group =</span> group, <span class="at">fill =</span> num_sites)) <span class="sc">+</span></span>
-<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">size =</span> <span class="fl">0.1</span>) <span class="sc">+</span>                             <span class="co"># draw each state polygon</span></span>
-<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">&quot;magma&quot;</span>, <span class="at">direction =</span> <span class="sc">-</span><span class="dv">1</span>, <span class="at">na.value =</span> <span class="st">&quot;grey90&quot;</span>,</span>
-<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>                       <span class="at">name =</span> <span class="st">&quot;Flu provider</span><span class="sc">\n</span><span class="st">locations&quot;</span>) <span class="sc">+</span>                <span class="co"># color scale similar to earlier global maps</span></span>
-<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>() <span class="sc">+</span>                                                      <span class="co"># keeps aspect ratio sensible for maps</span></span>
-<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Flu Vaccination Provider Locations per State&quot;</span>,</span>
-<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Providers listed in Vaccines.gov feed (higher fill = more sites)&quot;</span>,</span>
-<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span></span>
-<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span>                                                          <span class="co"># map-focused theme</span></span>
-<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">size =</span> <span class="dv">14</span>),</span>
-<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">size =</span> <span class="dv">11</span>),</span>
-<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>)</span>
-<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.1 Results: provider locations per state mapped</span></span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>state_counts_map <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">state_full =</span> <span class="fu">tolower</span>(state.name[<span class="fu">match</span>(state, state.abb)])) <span class="sc">%&gt;%</span>   <span class="co"># convert &quot;CA&quot; -&gt; &quot;california&quot; etc.</span></span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">count</span>(state_full, <span class="at">name =</span> <span class="st">&quot;num_sites&quot;</span>)                                   <span class="co"># how many provider locations per state_full</span></span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>usa_map <span class="ot">&lt;-</span> <span class="fu">map_data</span>(<span class="st">&quot;state&quot;</span>)                                              <span class="co"># polygon coords for lower 48 + AK, HI</span></span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>chorodata <span class="ot">&lt;-</span> usa_map <span class="sc">%&gt;%</span></span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(state_counts_map, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">&quot;region&quot;</span> <span class="ot">=</span> <span class="st">&quot;state_full&quot;</span>))            <span class="co"># attach counts to map polygons</span></span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(chorodata, <span class="fu">aes</span>(long, lat, <span class="at">group =</span> group, <span class="at">fill =</span> num_sites)) <span class="sc">+</span></span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">size =</span> <span class="fl">0.1</span>) <span class="sc">+</span>                             <span class="co"># draw each state polygon</span></span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">option =</span> <span class="st">&quot;magma&quot;</span>, <span class="at">direction =</span> <span class="sc">-</span><span class="dv">1</span>, <span class="at">na.value =</span> <span class="st">&quot;grey90&quot;</span>,</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>                       <span class="at">name =</span> <span class="st">&quot;Flu provider</span><span class="sc">\n</span><span class="st">locations&quot;</span>) <span class="sc">+</span>                <span class="co"># color scale similar to earlier global maps</span></span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>() <span class="sc">+</span>                                                      <span class="co"># keeps aspect ratio sensible for maps</span></span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Flu Vaccination Provider Locations per State&quot;</span>,</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Providers listed in Vaccines.gov feed (higher fill = more sites)&quot;</span>,</span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span></span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span>                                                          <span class="co"># map-focused theme</span></span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">size =</span> <span class="dv">14</span>),</span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">hjust =</span> <span class="fl">0.5</span>, <span class="at">size =</span> <span class="dv">11</span>),</span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">legend.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>)</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Warning: Using `size` aesthetic for lines was deprecated in ggplot2 3.4.0.
 ℹ Please use `linewidth` instead.</code></pre>
@@ -2882,31 +2934,31 @@ The following object is masked from &#39;package:purrr&#39;:
 <section id="brief-reports-provider-locations-are-dense-in-populous-states-e.g.-ca-tx-fl-and-ny-and-more-sparse-in-smaller-population-states-and-certain-rural-regions.-this-mirrors-what-we-saw-in-environmental-monitoring-site-maps-where-spatial-coverage-clusters-around-populated-corridors.the-reason-of-such-differences-might-be-states-with-large-urban-populations-show-more-listed-vaccination-sites." class="level2">
 <h2 class="anchored" data-anchor-id="brief-reports-provider-locations-are-dense-in-populous-states-e.g.-ca-tx-fl-and-ny-and-more-sparse-in-smaller-population-states-and-certain-rural-regions.-this-mirrors-what-we-saw-in-environmental-monitoring-site-maps-where-spatial-coverage-clusters-around-populated-corridors.the-reason-of-such-differences-might-be-states-with-large-urban-populations-show-more-listed-vaccination-sites.">Brief Reports: Provider locations are dense in populous states (e.g., CA, TX, FL, and NY) and more sparse in smaller-population states and certain rural regions. This mirrors what we saw in environmental monitoring site maps, where spatial coverage clusters around populated corridors.The reason of such differences might be states with large urban populations show more listed vaccination sites.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.2 Point map of all provider locations </span></span>
-<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a><span class="do">## quick point map of provider locations (sampled)</span></span>
-<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">12</span>)                                                               <span class="co"># reproducible sample for plotting</span></span>
-<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>fluvac_sample <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span> <span class="fu">sample_n</span>(<span class="fu">min</span>(<span class="dv">10000</span>, <span class="fu">n</span>()))                       <span class="co"># take up to 10k points for visualization</span></span>
-<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>usa_states <span class="ot">&lt;-</span> <span class="fu">map_data</span>(<span class="st">&quot;state&quot;</span>)                                            <span class="co"># U.S. basemap polygons</span></span>
-<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
-<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">data =</span> usa_states,</span>
-<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a>               <span class="fu">aes</span>(<span class="at">x =</span> long, <span class="at">y =</span> lat, <span class="at">group =</span> group),</span>
-<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>               <span class="at">fill =</span> <span class="st">&quot;grey95&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span>        <span class="co"># light gray U.S. map background</span></span>
-<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> fluvac_sample,</span>
-<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>             <span class="fu">aes</span>(<span class="at">x =</span> lon, <span class="at">y =</span> lat),</span>
-<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>             <span class="at">alpha =</span> <span class="fl">0.3</span>, <span class="at">size =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">&quot;purple4&quot;</span>) <span class="sc">+</span>                 <span class="co"># purple-ish dots for provider sites</span></span>
-<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>() <span class="sc">+</span></span>
-<span id="cb29-16"><a href="#cb29-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
-<span id="cb29-17"><a href="#cb29-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Sampled Flu Vaccination Provider Locations in the U.S.&quot;</span>,</span>
-<span id="cb29-18"><a href="#cb29-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Each point is a listed provider site from Vaccines.gov&quot;</span>,</span>
-<span id="cb29-19"><a href="#cb29-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span></span>
-<span id="cb29-20"><a href="#cb29-20" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb29-21"><a href="#cb29-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
-<span id="cb29-22"><a href="#cb29-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
-<span id="cb29-23"><a href="#cb29-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>, <span class="at">size =</span> <span class="dv">14</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
-<span id="cb29-24"><a href="#cb29-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>)</span>
-<span id="cb29-25"><a href="#cb29-25" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.2 Point map of all provider locations </span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a><span class="do">## quick point map of provider locations (sampled)</span></span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">12</span>)                                                               <span class="co"># reproducible sample for plotting</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>fluvac_sample <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span> <span class="fu">sample_n</span>(<span class="fu">min</span>(<span class="dv">10000</span>, <span class="fu">n</span>()))                       <span class="co"># take up to 10k points for visualization</span></span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>usa_states <span class="ot">&lt;-</span> <span class="fu">map_data</span>(<span class="st">&quot;state&quot;</span>)                                            <span class="co"># U.S. basemap polygons</span></span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>() <span class="sc">+</span></span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_polygon</span>(<span class="at">data =</span> usa_states,</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>               <span class="fu">aes</span>(<span class="at">x =</span> long, <span class="at">y =</span> lat, <span class="at">group =</span> group),</span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>               <span class="at">fill =</span> <span class="st">&quot;grey95&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>, <span class="at">linewidth =</span> <span class="fl">0.2</span>) <span class="sc">+</span>        <span class="co"># light gray U.S. map background</span></span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">data =</span> fluvac_sample,</span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>             <span class="fu">aes</span>(<span class="at">x =</span> lon, <span class="at">y =</span> lat),</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>             <span class="at">alpha =</span> <span class="fl">0.3</span>, <span class="at">size =</span> <span class="fl">0.5</span>, <span class="at">color =</span> <span class="st">&quot;purple4&quot;</span>) <span class="sc">+</span>                 <span class="co"># purple-ish dots for provider sites</span></span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">coord_quickmap</span>() <span class="sc">+</span></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">&quot;Sampled Flu Vaccination Provider Locations in the U.S.&quot;</span>,</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>    <span class="at">subtitle =</span> <span class="st">&quot;Each point is a listed provider site from Vaccines.gov&quot;</span>,</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="cn">NULL</span></span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(</span>
+<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.title =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">&quot;bold&quot;</span>, <span class="at">size =</span> <span class="dv">14</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>),</span>
+<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">plot.subtitle =</span> <span class="fu">element_text</span>(<span class="at">size =</span> <span class="dv">11</span>, <span class="at">hjust =</span> <span class="fl">0.5</span>)</span>
+<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a>  )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -2919,21 +2971,21 @@ The following object is masked from &#39;package:purrr&#39;:
 <section id="brief-reports-the-result-above-revealed-the-spatial-distribution-of-influenza-vaccine-provider-sites-across-the-united-states.-a-point-map-representation-of-sampling-provider-sites-up-to-10000-locations-illustrated-that-flu-vaccine-providers-are-extensively-distributed-throughout-the-country-with-much-larger-densities-in-highly-populated-areas-especially-along-the-east-coast-california-texas-and-some-sections-of-the-midwest.-in-contrast-rural-and-less-densely-inhabited-regions-such-as-the-mountain-west-and-some-sections-of-the-great-plains-had-a-relatively-lower-number-of-provider-locations.-this-geographical-distribution-pattern-corresponded-with-anticipated-population-and-healthcare-infrastructure-density-indicating-increased-provider-supply-in-metropolitan-areas-where-demand-is-greatest.-infrastructure-patterns." class="level2">
 <h2 class="anchored" data-anchor-id="brief-reports-the-result-above-revealed-the-spatial-distribution-of-influenza-vaccine-provider-sites-across-the-united-states.-a-point-map-representation-of-sampling-provider-sites-up-to-10000-locations-illustrated-that-flu-vaccine-providers-are-extensively-distributed-throughout-the-country-with-much-larger-densities-in-highly-populated-areas-especially-along-the-east-coast-california-texas-and-some-sections-of-the-midwest.-in-contrast-rural-and-less-densely-inhabited-regions-such-as-the-mountain-west-and-some-sections-of-the-great-plains-had-a-relatively-lower-number-of-provider-locations.-this-geographical-distribution-pattern-corresponded-with-anticipated-population-and-healthcare-infrastructure-density-indicating-increased-provider-supply-in-metropolitan-areas-where-demand-is-greatest.-infrastructure-patterns.">Brief Reports: The result above revealed the spatial distribution of influenza vaccine provider sites across the United States. A point map representation of sampling provider sites (up to 10,000 locations) illustrated that flu vaccine providers are extensively distributed throughout the country, with much larger densities in highly populated areas, especially along the East Coast, California, Texas, and some sections of the Midwest. In contrast, rural and less densely inhabited regions, such as the Mountain West and some sections of the Great Plains, had a relatively lower number of provider locations. This geographical distribution pattern corresponded with anticipated population and healthcare infrastructure density, indicating increased provider supply in metropolitan areas where demand is greatest. infrastructure patterns.</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.3 Results: Minimum eligible age: looking at what fraction of locations explicitly advertise high-dose/adjuvanted doses for adults 65+ vs. general flu shots vs. nasal spray (often pediatrics/younger adults):</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>age_mix <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(age_group) <span class="sc">%&gt;%</span>                                            <span class="co"># &quot;65_plus&quot;, &quot;younger_adult_child&quot;, &quot;all_ages_general&quot;</span></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),                                                   <span class="co"># number of sites offering that product type</span></span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">pct_sites =</span> <span class="dv">100</span> <span class="sc">*</span> n_sites <span class="sc">/</span> <span class="fu">nrow</span>(fluvac),                        <span class="co"># share of all sites</span></span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
-<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>  )</span>
-<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(age_mix,</span>
-<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Flu Vaccine Eligibility Focus (based on product labeling at site)&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
-<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(age_mix), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.3 Results: Minimum eligible age: looking at what fraction of locations explicitly advertise high-dose/adjuvanted doses for adults 65+ vs. general flu shots vs. nasal spray (often pediatrics/younger adults):</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>age_mix <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(age_group) <span class="sc">%&gt;%</span>                                            <span class="co"># &quot;65_plus&quot;, &quot;younger_adult_child&quot;, &quot;all_ages_general&quot;</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),                                                   <span class="co"># number of sites offering that product type</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="at">pct_sites =</span> <span class="dv">100</span> <span class="sc">*</span> n_sites <span class="sc">/</span> <span class="fu">nrow</span>(fluvac),                        <span class="co"># share of all sites</span></span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb29-10"><a href="#cb29-10" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(age_mix,</span>
+<span id="cb29-11"><a href="#cb29-11" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Flu Vaccine Eligibility Focus (based on product labeling at site)&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-12"><a href="#cb29-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
+<span id="cb29-13"><a href="#cb29-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb29-14"><a href="#cb29-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-15"><a href="#cb29-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(age_mix), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div class="table-responsive">
 <table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">
@@ -2970,29 +3022,29 @@ The following object is masked from &#39;package:purrr&#39;:
 <section id="brief-reports-a-substantial-fraction-of-listed-locations-explicitly-offer-senior-focused-formulations-65-high-dose-or-adjuvanted-vaccines-about-31.-this-result-may-highlight-targeted-access-for-older-adults-a-high-risk-group-for-severe-influenza-outcomes.-additionally-most-locations-advertise-a-general-flu-shot-assumed-to-cover-standard-quadrivalent-inactivated-influenza-vaccine-for-the-general-population-6-months." class="level2">
 <h2 class="anchored" data-anchor-id="brief-reports-a-substantial-fraction-of-listed-locations-explicitly-offer-senior-focused-formulations-65-high-dose-or-adjuvanted-vaccines-about-31.-this-result-may-highlight-targeted-access-for-older-adults-a-high-risk-group-for-severe-influenza-outcomes.-additionally-most-locations-advertise-a-general-flu-shot-assumed-to-cover-standard-quadrivalent-inactivated-influenza-vaccine-for-the-general-population-6-months.">Brief Reports: A substantial fraction of listed locations explicitly offer senior-focused formulations (‘65+’, high-dose or adjuvanted vaccines) (about 31%). This result may highlight targeted access for older adults, a high-risk group for severe influenza outcomes. Additionally, most locations advertise a general ‘Flu Shot’, assumed to cover standard quadrivalent inactivated influenza vaccine for the general population (6 months+).</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.4. Within-State Market Share of Flu Vaccination Providers in the United States</span></span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>dominance_share <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">state_total_sites =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span>                                      <span class="co"># total sites in that state</span></span>
-<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state, provider_chain) <span class="sc">%&gt;%</span></span>
-<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
-<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),</span>
-<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">state_total_sites =</span> <span class="fu">first</span>(state_total_sites),</span>
-<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">share_pct =</span> <span class="dv">100</span> <span class="sc">*</span> n_sites <span class="sc">/</span> state_total_sites,                          <span class="co"># % share of listings in that state for that chain</span></span>
-<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
-<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
-<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(share_pct)) <span class="sc">%&gt;%</span></span>
-<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
-<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(<span class="at">order_by =</span> share_pct, <span class="at">n =</span> <span class="dv">1</span>, <span class="at">with_ties =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span>             <span class="co"># which chain has highest within-state share %</span></span>
-<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
-<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(dominance_share,</span>
-<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Within-state market share: which chain accounts for the largest share of listed flu vaccine locations in each state?&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
-<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(dominance_share), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))      <span class="co">#</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 4.4. Within-State Market Share of Flu Vaccination Providers in the United States</span></span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>dominance_share <span class="ot">&lt;-</span> fluvac <span class="sc">%&gt;%</span></span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">state_total_sites =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span>                                      <span class="co"># total sites in that state</span></span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state, provider_chain) <span class="sc">%&gt;%</span></span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">n_sites =</span> <span class="fu">n</span>(),</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">state_total_sites =</span> <span class="fu">first</span>(state_total_sites),</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">share_pct =</span> <span class="dv">100</span> <span class="sc">*</span> n_sites <span class="sc">/</span> state_total_sites,                          <span class="co"># % share of listings in that state for that chain</span></span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">.groups =</span> <span class="st">&quot;drop&quot;</span></span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(share_pct)) <span class="sc">%&gt;%</span></span>
+<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
+<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_max</span>(<span class="at">order_by =</span> share_pct, <span class="at">n =</span> <span class="dv">1</span>, <span class="at">with_ties =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span>             <span class="co"># which chain has highest within-state share %</span></span>
+<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>()</span>
+<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
+<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a><span class="fu">kable</span>(dominance_share,</span>
+<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a>      <span class="at">caption =</span> <span class="st">&quot;Within-state market share: which chain accounts for the largest share of listed flu vaccine locations in each state?&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">kable_styling</span>(<span class="at">full_width =</span> <span class="cn">FALSE</span>, <span class="at">position =</span> <span class="st">&quot;center&quot;</span>,</span>
+<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>                <span class="at">bootstrap_options =</span> <span class="fu">c</span>(<span class="st">&quot;striped&quot;</span>,<span class="st">&quot;hover&quot;</span>,<span class="st">&quot;condensed&quot;</span>,<span class="st">&quot;responsive&quot;</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">0</span>, <span class="at">bold =</span> <span class="cn">TRUE</span>, <span class="at">background =</span> <span class="st">&quot;#756bb1&quot;</span>, <span class="at">color =</span> <span class="st">&quot;white&quot;</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">row_spec</span>(<span class="dv">1</span><span class="sc">:</span><span class="fu">nrow</span>(dominance_share), <span class="at">background =</span> <span class="fu">c</span>(<span class="st">&quot;#efedf5&quot;</span>,<span class="st">&quot;white&quot;</span>))      <span class="co">#</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div class="table-responsive">
 <table class="table table-striped table-hover table-condensed caption-top table-sm small" data-quarto-postprocess="true">

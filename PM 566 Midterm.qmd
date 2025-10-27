@@ -4,6 +4,7 @@ author: "Ziquan 'Harrison' Liu"
 format: 
   html:
     embed-resources: true
+    css: style.css
 fig-width: 8
 fig-heigth: 6
 ---
@@ -43,8 +44,7 @@ fluvacall = read.csv("/Users/ldh/Library/Mobile Documents/com~apple~CloudDocs/US
 ## days_since_update: how stale the stock info is (use Sys.Date() for “today”)
 ## state / lat / lon kept for mapping
 ## in_stock_flag and supply_level for availability
-# --- Data Prep: create cleaned analytic dataset
-# --- Data Prep: create cleaned analytic dataset
+#Data Prep: create cleaned analytic dataset
 fluvac <- fluvacall %>%                                                   # start with raw data
   mutate(
     provider_chain = str_squish(loc_name),                                  # collapse extra spaces in provider name
@@ -104,25 +104,25 @@ vaccine_type_counts
 age_group_counts
 ### the output below was used for providing characteristics such as type [≈provider_chain], minimum eligible age [≈age_group], and vaccine supply updates, so need to know if  have enough variation in those variables to analyze.
 ```
+## Brief description: The aforementioned results indicated that the predominant percentage of flu vaccination sites publicize availability for the general populace (65.0%), followed by a significant portion aimed specifically at adults aged 65 and older (31.0%), while a mere minority (4.0%) explicitly advertised eligibility for younger adults or children, highlighting a provider emphasis on widespread accessibility with an additional focus on older adults.
 ```{r}
 # 3.3 numrix summaries with sapply() style (distribution sanity check)
 numeric_vars <- fluvac %>%                                                               # select numeric-ish variables
   select(days_since_update, supply_level_clean, lat, lon)                                # timing of updates, supply, and coordinates for mapping
 num_summary <- sapply(numeric_vars, summary)                                             # summary() for each numeric variable (Min/1Q/Median/Mean/3Q/Max)
-num_missing <- sapply(numeric_vars, function(x) sum(is.na(x)))                           # number of NAs by numeric variable
 ## wrap numeric summary into a nicer long-format table for kable (so no raw console dump):
 num_summary_tbl <- as.data.frame(t(num_summary)) %>%                                     # transpose so each row = variable
-  mutate(var = rownames(.),
-         n_missing = num_missing[ var ]) %>%                                             # attach missing counts per variable
+  mutate(var = rownames(.)) %>%                                             # attach missing counts per variable
   relocate(var)
 #
 kable(num_summary_tbl,
-      caption = "Distribution summaries for numeric variables in `fluvac` (with missing counts)") %>%  # publishable numeric summary  #
+      caption = "Distribution summaries for numeric variables in `fluvac`") %>%  # publishable numeric summary  #
   kable_styling(full_width = FALSE, position = "center",
                 bootstrap_options = c("striped","hover","condensed","responsive")) %>%
   row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%
   row_spec(1:nrow(num_summary_tbl), background = c("#efedf5","white"))                                  #
 ```
+## Brief description: The results indicated that although geographic coordinates (latitude and longitude) correspond with the anticipated range of U.S. provider locations, the variable days since update displayed a broad distribution (median ≈454 days, maximum >800 days), implying potential issues regarding data timeliness. Additionally, the supply level variable demonstrates minimal variation, which may limit its interpretability in epidemiological analyses.
 ```{r}
 # 3.4 Visualize basic distributions:
 ## distribution of sites per state (bar plot)
@@ -139,28 +139,60 @@ ggplot(state_counts, aes(x = reorder(state, num_sites), y = num_sites, fill = st
     y = "Number of provider locations"                           # y-axis label
   ) +
   theme_minimal(base_size = 12)                                  # clean theme
-### The output below showed states with the highest counts of listed flu vaccine providers include [Top 10: CA, TX, FL, NY, PA,IL,OH,VA,NC,MI], reflecting high retail pharmacy density and population size. States/territories with the fewest listed providers tend to be smaller-population jurisdictions or territories.
 ```
+## Brief description: The output below showed states with the highest counts of listed flu vaccine providers include [Top 10: CA, TX, FL, NY, PA,IL,OH,VA,NC,MI], reflecting high retail pharmacy density and population size. States/territories with the fewest listed providers tend to be smaller-population jurisdictions or territories.
 ```{r}
 ## checking in-stock status and stock recency
 stock_summary <- fluvac %>%
   mutate(
-    stock_status = if_else(isTRUE(in_stock_flag), "In stock", "Not in stock / Unknown")  # readable flag
+    # Step 1. Coerce in_stock_flag into a clean logical variable                  #
+    in_stock_clean = case_when(
+      # if it's already logical TRUE/FALSE, keep it                              #
+      in_stock_flag %in% c(TRUE, FALSE) ~ as.logical(in_stock_flag),             
+
+      # if it's "true"/"false" as character or factor, convert to logical        #
+      str_to_lower(str_trim(as.character(in_stock_flag))) == "true"  ~ TRUE,
+      str_to_lower(str_trim(as.character(in_stock_flag))) == "false" ~ FALSE,
+
+      # anything else becomes NA (shouldn't matter if you truly have no NA)     #
+      TRUE ~ NA
+    ),
+
+    # Step 2. Human-readable label for reporting                                 #
+    stock_status = if_else(
+      in_stock_clean %in% TRUE,                      # rowwise: is this location in stock?         #
+      "In stock",                                    # label if TRUE                                #
+      "Not in stock"                                 # label if FALSE or NA                         #
+    )
   ) %>%
   group_by(stock_status) %>%
   summarise(
-    n_sites = n(),                                                  # number of sites in each status
-    median_days_since_update = median(days_since_update, na.rm=TRUE),  # recency of last reported stock info
+    n_sites = n(),                                                   # number of locations in each status category          #
+    median_days_since_update = median(days_since_update, na.rm = TRUE), # typical recency of supply reporting (days)        #
     .groups = "drop"
   )
 #
-kable(stock_summary,
-      caption = "Stock status & reporting recency across flu vaccine provider locations") %>%
-  kable_styling(full_width = FALSE, position = "center",
-                bootstrap_options = c("striped","hover","condensed","responsive")) %>%
-  row_spec(0, bold = TRUE, background = "#756bb1", color = "white") %>%        # styled header like earlier tables
-  row_spec(1:nrow(stock_summary), background = c("#efedf5","white"))           # alternating row colors
+kable(
+  stock_summary,
+  caption = "Stock status & reporting recency across flu vaccine provider locations"
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    bootstrap_options = c("striped","hover","condensed","responsive")
+  ) %>%
+  row_spec(
+    0,
+    bold = TRUE,
+    background = "#756bb1",
+    color = "white"
+  ) %>%
+  row_spec(
+    1:nrow(stock_summary),
+    background = c("#efedf5","white")
+  )
 ```
+## Brief description: The results showed that approximately 24.5% (49,713 locations) of flu vaccine providers reported being in stock, with a median reporting recency of 571 days. In contrast, the majority (152,927 locations) were classified as not in stock, with a median reporting recency of 451 days, underscoring significant variability and potential delays in stock status updates among sites.
 ```{r}
 # distribution of days since last stock update
 ggplot(fluvac, aes(x = days_since_update)) +
@@ -172,6 +204,7 @@ ggplot(fluvac, aes(x = days_since_update)) +
   ) +
   theme_minimal(base_size = 12)
 ```
+## Brief description:The histogram revealed that most flu vaccine supplier locations had not refreshed their stock status for several hundred days, particularly clustered around 450–600 days, indicating a lack of recent updates and likely deficiencies in the timely reporting of vaccine availability.
 ```{r}
 ## Violin plot of days_since_update by age_group
 p_violin_age <- ggplot(
@@ -188,6 +221,7 @@ p_violin_age <- ggplot(
   theme(legend.position = "none")
 p_violin_age
 ```
+## Brief description: The violin plot illustrated that across all estimated eligible age categories (65+, all ages, and younger populations), stock updates are comparably old, with elongated right-skewed distributions indicating considerable delays in the latest reporting of vaccination availability.
 ```{r}
 ## Density of days_since_update (freshness overall)
 p_density_fresh <- ggplot(
@@ -203,6 +237,7 @@ p_density_fresh <- ggplot(
   theme_minimal(base_size = 11)  
 p_density_fresh
 ```
+## Brief description: The density map revealed that most flu vaccine supplier sites had not refreshed stock information for several hundred days, with significant peaks at 450 and 570 days, underscoring considerable delays in reporting recency across several locales.
 ```{r}
 ## Average days_since_update by state (line or lollipop-style)
 state_fresh <- fluvac %>%
@@ -228,6 +263,7 @@ p_state_line <- ggplot(
   theme_minimal(base_size = 11)  
 p_state_line
 ```
+## Brief description: The figure depicted the average duration since the last reported influenza vaccine stock update by U.S. state, revealing significant variation among states, with the majority falling within the range of approximately 450–500 days, thereby underscoring discrepancies in reporting timeliness that may indicate differences in provider practices or state-level surveillance systems.
 
 # 4. Preliminary Results
 ```{r}
